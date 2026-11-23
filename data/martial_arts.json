@@ -1,0 +1,42 @@
+{
+  "skills": {
+    "breath":{"name":"基础调息","kind":"内功","cost":0,"cooldown":3,"beats":1,"description":"恢复 4 内力，护体 2 拍。主心法提供攻防加成，可给刀剑注劲。"},
+    "sword":{"name":"点锋","kind":"外功","weapon":"sword","cost":3,"range":2,"power":6,"infusion_cap":1,"cooldown":2,"beats":1,"requires":"breath","description":"直线 2 格刺击，中间格不能有墙、低障或敌人。"},
+    "saber":{"name":"压门斩","kind":"外功","weapon":"saber","cost":3,"range":1,"power":8,"infusion_cap":1,"cooldown":2,"beats":1,"requires":"breath","description":"贴身压制，破架并打断蓄势。"},
+    "guard":{"name":"基础格挡","kind":"外功","cost":0,"cooldown":2,"beats":1,"description":"面向目标架势，减免下一次正面近战与附带伤势。"},
+    "leap":{"name":"跃步","kind":"轻功","cost":2,"cooldown":3,"beats":1,"description":"沿四向空地跃 1–2 格。腿伤时不可用。"}
+  },
+  "forms": [
+    {"id":"fist","name":"拳","attack":"崩拳","defense":"抱架","status":"placeholder"},
+    {"id":"palm","name":"掌","attack":"推山掌","defense":"拨掌","status":"placeholder"},
+    {"id":"finger","name":"指","attack":"封穴指","defense":"截指","status":"placeholder"},
+    {"id":"leg","name":"腿","attack":"扫腿","defense":"退步架腿","status":"placeholder"},
+    {"id":"foot","name":"脚","attack":"踏步压制","defense":"沉步","status":"placeholder"},
+    {"id":"throwing","name":"暗器","attack":"牵制飞镖","defense":"封路镖","status":"placeholder"},
+    {"id":"short","name":"短兵","attack":"贴身疾刺","defense":"翻腕格挡","status":"placeholder"},
+    {"id":"sword","name":"剑","attack":"点锋","defense":"基础格挡","status":"playable"},
+    {"id":"saber","name":"刀","attack":"压门斩","defense":"基础格挡","status":"playable"},
+    {"id":"polearm","name":"长兵","attack":"横扫长柄","defense":"横杆封路","status":"placeholder"},
+    {"id":"whip","name":"鞭","attack":"回环鞭","defense":"绕鞭卸势","status":"placeholder"},
+    {"id":"fan","name":"扇","attack":"合扇点击","defense":"开扇拨挡","status":"placeholder"},
+    {"id":"axe","name":"斧","attack":"劈架","defense":"倚斧稳桩","status":"placeholder"},
+    {"id":"staff","name":"棍","attack":"扫棍","defense":"拦门棍","status":"placeholder"},
+    {"id":"spear","name":"枪","attack":"拦路刺","defense":"拒进式","status":"placeholder"},
+    {"id":"hammer","name":"锤","attack":"摆锤震击","defense":"收锤守势","status":"placeholder"},
+    {"id":"claw","name":"爪","attack":"扣爪","defense":"反扣","status":"placeholder"},
+    {"id":"hook","name":"钩","attack":"探钩牵引","defense":"双钩封刃","status":"placeholder"},
+    {"id":"exotic","name":"奇门","attack":"点脉笔","defense":"架笔避锋","status":"placeholder"}
+  ],
+  "internal": {
+    "breath":{"name":"基础调息","element":"neutral","attack":1,"defense":1,"infusion_cap":1,"status":"playable"},
+    "frost":{"name":"寒息","element":"cold","attack":1,"defense":1,"infusion_cap":3,"status":"placeholder"},
+    "flame":{"name":"炎劲","element":"fire","attack":2,"defense":0,"infusion_cap":3,"status":"placeholder"},
+    "venom":{"name":"毒息","element":"poison","attack":1,"defense":0,"infusion_cap":2,"status":"placeholder"},
+    "storm":{"name":"雷劲","element":"thunder","attack":1,"defense":1,"infusion_cap":3,"status":"placeholder"}
+  },
+  "elements": {
+    "neutral":{"name":"中性","threshold":0}, "cold":{"name":"寒","threshold":2}, "fire":{"name":"火","threshold":2},
+    "poison":{"name":"毒","threshold":3}, "thunder":{"name":"雷","threshold":1}
+  },
+  "movement":{"actions_per_beat":1,"evasion":0,"jump_height":0,"leap_range":2,"light_bonus":15,"alert_limit":100}
+}

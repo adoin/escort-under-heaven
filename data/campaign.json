@@ -1,0 +1,31 @@
+{
+  "talents": {
+    "body":{"name":"耐打","description":"生命上限 +6。初始装备朴刀。"},
+    "agility":{"name":"轻身","description":"闪避 +8 个百分点。初始装备铁剑。"},
+    "spirit":{"name":"静心","description":"内力上限 +4。初始装备铁剑。"}
+  },
+  "items": {
+    "medicine":{"name":"金创药","buy":8,"sell":3,"stack":4},
+    "food":{"name":"干粮","buy":5,"sell":2,"stack":4},
+    "water":{"name":"清水","buy":4,"sell":1,"stack":4},
+    "silk":{"name":"山货","buy":18,"sell":12,"stack":3},
+    "token":{"name":"寨匪牙牌","buy":0,"sell":5,"stack":4},
+    "silverware":{"name":"旧银器","buy":0,"sell":24,"stack":2}
+  },
+  "gear": {
+    "sword":{"name":"铁剑","power":4,"value":22},
+    "saber":{"name":"朴刀","power":5,"value":24},
+    "jacket":{"name":"布衣","value":8}
+  },
+  "enemies": {
+    "sentry":{"name":"巡哨","hp":13,"damage":5,"bleed":3,"sense":5},
+    "raider":{"name":"刀匪","hp":18,"damage":7,"leg":true,"sense":5},
+    "chief":{"name":"寨头","hp":24,"damage":6,"charge":true,"sense":6},
+    "trainer":{"name":"镖师","hp":1,"damage":1,"bleed":3,"sense":1}
+  },
+  "jobs": {
+    "lost_escort":{"name":"失镖取证","description":"从林道进黑松寨，取回原镖账册，带到归雁客栈交榜。","pay":105,"credit":12,"renown":8},
+    "route_survey":{"name":"复勘镖路","description":"走镖前复勘寨门。进入黑松寨后回归雁客栈交榜。","pay":30,"credit":3,"renown":3}
+  },
+  "trade_routes": [{"id":"greenwater_ferry","origin":"青水县 · 陆记商铺","destination":"柳津渡","cargo":"silk","destination_price":28,"status":"placeholder"}]
+}
