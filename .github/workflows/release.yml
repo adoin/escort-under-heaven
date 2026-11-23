@@ -1,0 +1,208 @@
+name: Godot Release
+
+# Pin editor and templates to 4.5.1-stable, the version verified with the P0 project.
+env:
+  GODOT_VERSION: '4.5.1'
+
+on:
+  push:
+    tags: ['v*']
+
+# Queue tag releases so each can inherit the previous run and prune completed history.
+concurrency:
+  group: godot-tag-release
+  queue: max
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  build:
+    if: ${{ !github.event.deleted }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Fingerprint export inputs
+        id: inputs
+        shell: bash
+        run: |
+          printf 'XDG_DATA_HOME=%s\n' "$RUNNER_TEMP/godot-data" >> "$GITHUB_ENV"
+          printf 'TEMPLATE_DIR=%s\n' "$RUNNER_TEMP/godot-data/godot/export_templates/$GODOT_VERSION.stable" >> "$GITHUB_ENV"
+          sources=$(git ls-tree -r HEAD -- . ':(exclude)README.md' ':(exclude)docs/**' ':(exclude)tests/**')
+          printf 'package=%s\n' "$(printf '%s\n%s\n' "$GODOT_VERSION" "$sources" | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      # Actions caches are scoped to the current ref and default branch. A previous
+      # tag's successful build provides the cross-tag fallback in the next step.
+      - name: Cache Godot export templates and imports
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.TEMPLATE_DIR }}
+            .godot/imported
+          key: godot-${{ runner.os }}-${{ env.GODOT_VERSION }}-${{ hashFiles('export_presets.cfg') }}-${{ steps.inputs.outputs.package }}
+          restore-keys: |
+            godot-${{ runner.os }}-${{ env.GODOT_VERSION }}-${{ hashFiles('export_presets.cfg') }}-
+
+      - name: Restore previous successful build
+        id: inherit
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_KEY: ${{ steps.inputs.outputs.package }}
+          PREVIOUS_DIR: ${{ runner.temp }}/previous-godot-build
+        run: |
+          previous_run=$(gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/release.yml/runs" \
+            -f event=push -f status=success -F per_page=1 --jq '.workflow_runs[0].id // empty')
+          if [[ -z "$previous_run" ]]; then
+            echo 'No previous successful release run.'
+            exit 0
+          fi
+          mkdir -p "$PREVIOUS_DIR"
+          gh run download "$previous_run" --name godot-build-base --repo "$GITHUB_REPOSITORY" --dir "$PREVIOUS_DIR"
+          test "$(cat "$PREVIOUS_DIR/cache-key")" = "$GODOT_VERSION:${{ hashFiles('export_presets.cfg') }}"
+          mkdir -p "$TEMPLATE_DIR" .godot/imported
+          cp -a --update=none "$PREVIOUS_DIR/templates/." "$TEMPLATE_DIR/"
+          cp -a --update=none "$PREVIOUS_DIR/imported/." .godot/imported/
+          if [[ "$(cat "$PREVIOUS_DIR/package-key")" == "$PACKAGE_KEY" ]]; then
+            for target in linux windows web; do
+              unzip -tq "$PREVIOUS_DIR/dist/escort-under-heaven-$target.zip"
+            done
+            mv "$PREVIOUS_DIR/dist" dist
+            echo 'packages_restored=true' >> "$GITHUB_OUTPUT"
+            echo 'Reused all three packages from the previous successful release.'
+          else
+            echo 'Restored the previous release build base. Export inputs changed.'
+          fi
+
+      - name: Install pinned Godot and missing templates
+        if: ${{ steps.inherit.outputs.packages_restored != 'true' }}
+        shell: bash
+        run: |
+          base="https://github.com/godotengine/godot-builds/releases/download/$GODOT_VERSION-stable"
+          editor="Godot_v$GODOT_VERSION-stable_linux.x86_64"
+          curl -fsSL --retry 3 "$base/$editor.zip" -o "$RUNNER_TEMP/godot.zip"
+          unzip -q "$RUNNER_TEMP/godot.zip" -d "$RUNNER_TEMP/godot-bin"
+          ln -s "$RUNNER_TEMP/godot-bin/$editor" "$RUNNER_TEMP/godot-bin/godot"
+          "$RUNNER_TEMP/godot-bin/godot" --version
+          echo "$RUNNER_TEMP/godot-bin" >> "$GITHUB_PATH"
+          mkdir -p "$TEMPLATE_DIR"
+          missing=()
+          for template in linux_release.x86_64 windows_release_x86_64.exe web_nothreads_release.zip; do
+            if [[ ! -s "$TEMPLATE_DIR/$template" ]]; then
+              missing+=("templates/$template")
+            fi
+          done
+          if (( ${#missing[@]} )); then
+            curl -fsSL --retry 3 "$base/Godot_v$GODOT_VERSION-stable_export_templates.tpz" -o "$RUNNER_TEMP/templates.tpz"
+            unzip -jo "$RUNNER_TEMP/templates.tpz" "${missing[@]}" -d "$TEMPLATE_DIR"
+          fi
+
+      - name: Import changes and export Linux Windows Web
+        if: ${{ steps.inherit.outputs.packages_restored != 'true' }}
+        shell: bash
+        run: |
+          mkdir -p .godot/imported dist "$RUNNER_TEMP/export/"{linux,windows,web}
+          godot --headless --path . --import
+          godot --headless --path . --export-release Linux "$RUNNER_TEMP/export/linux/escort-under-heaven.x86_64"
+          godot --headless --path . --export-release Windows "$RUNNER_TEMP/export/windows/escort-under-heaven.exe"
+          godot --headless --path . --export-release Web "$RUNNER_TEMP/export/web/index.html"
+          test -x "$RUNNER_TEMP/export/linux/escort-under-heaven.x86_64"
+          test -s "$RUNNER_TEMP/export/windows/escort-under-heaven.exe"
+          test -s "$RUNNER_TEMP/export/web/index.html"
+          for target in linux windows web; do
+            (cd "$RUNNER_TEMP/export/$target" && zip -q -r "$GITHUB_WORKSPACE/dist/escort-under-heaven-$target.zip" .)
+          done
+
+      - name: Stage build base for the next tag
+        shell: bash
+        env:
+          PACKAGE_KEY: ${{ steps.inputs.outputs.package }}
+          BUILD_BASE: ${{ runner.temp }}/godot-build-base
+        run: |
+          mkdir -p "$BUILD_BASE"/{templates,imported}
+          cp -a "$TEMPLATE_DIR/." "$BUILD_BASE/templates/"
+          cp -a .godot/imported/. "$BUILD_BASE/imported/"
+          cp -a dist "$BUILD_BASE/"
+          printf '%s\n' "$GODOT_VERSION:${{ hashFiles('export_presets.cfg') }}" > "$BUILD_BASE/cache-key"
+          printf '%s\n' "$PACKAGE_KEY" > "$BUILD_BASE/package-key"
+          touch "$BUILD_BASE/imported/.keep"
+
+      - name: Upload build base for 7 days
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot-build-base
+          path: ${{ runner.temp }}/godot-build-base/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+          overwrite: true
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download packaged exports
+        uses: actions/download-artifact@v4
+        with:
+          name: godot-build-base
+          path: release-build
+
+      - name: Publish tag release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" release-build/dist/*.zip --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$RELEASE_TAG" release-build/dist/*.zip --repo "$GITHUB_REPOSITORY" \
+              --verify-tag --title "$RELEASE_TAG" --generate-notes
+          fi
+
+  retention:
+    needs: [build, publish]
+    if: ${{ always() && !cancelled() && !github.event.deleted }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Retain 3 successful and 3 failed release runs
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          PUBLISH_RESULT: ${{ needs.publish.result }}
+        run: |
+          conclusion=failure
+          if [[ "$BUILD_RESULT" == success && "$PUBLISH_RESULT" == success ]]; then
+            conclusion=success
+          fi
+          runs=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/workflows/release.yml/runs?per_page=100")
+          stale=$(jq -sr --argjson current "$GITHUB_RUN_ID" --arg conclusion "$conclusion" '
+            [.[].workflow_runs[]] | unique_by(.id) | map(
+              if .id == $current then .status = "completed" | .conclusion = $conclusion else . end
+            ) | map(select(.status == "completed")) |
+            group_by(.conclusion)[] | sort_by(.created_at, .id) | reverse |
+            (if .[0].conclusion == "success" or .[0].conclusion == "failure" then .[3:] else . end)[] |
+            select(.id != $current) | .id
+          ' <<< "$runs")
+          while IFS= read -r run_id; do
+            [[ -n "$run_id" ]] || continue
+            if ! gh api --method DELETE "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" --silent; then
+              echo "::warning::Could not delete release run $run_id"
+            fi
+          done <<< "$stale"
