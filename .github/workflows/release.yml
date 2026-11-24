@@ -34,7 +34,7 @@ jobs:
         run: |
           printf 'XDG_DATA_HOME=%s\n' "$RUNNER_TEMP/godot-data" >> "$GITHUB_ENV"
           printf 'TEMPLATE_DIR=%s\n' "$RUNNER_TEMP/godot-data/godot/export_templates/$GODOT_VERSION.stable" >> "$GITHUB_ENV"
-          sources=$(git ls-tree -r HEAD -- . ':(exclude)README.md' ':(exclude)docs/**' ':(exclude)tests/**')
+          sources=$(git ls-tree -r HEAD | grep -v -E $'\t(README\.md$|docs/|tests/)')
           printf 'package=%s\n' "$(printf '%s\n%s\n' "$GODOT_VERSION" "$sources" | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
       # Actions caches are scoped to the current ref and default branch. A previous
