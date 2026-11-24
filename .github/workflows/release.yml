@@ -171,8 +171,42 @@ jobs:
               --verify-tag --title "$RELEASE_TAG" --generate-notes
           fi
 
+  deploy:
+    needs: build
+    if: ${{ needs.build.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download packaged exports
+        uses: actions/download-artifact@v4
+        with:
+          name: godot-build-base
+          path: release-build
+
+      - name: Extract single-threaded Web export for Pages
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/pages"
+          unzip -q release-build/dist/escort-under-heaven-web.zip -d "$RUNNER_TEMP/pages"
+          test -s "$RUNNER_TEMP/pages/index.html"
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/pages
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
   retention:
-    needs: [build, publish]
+    needs: [build, publish, deploy]
     if: ${{ always() && !cancelled() && !github.event.deleted }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -186,9 +220,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BUILD_RESULT: ${{ needs.build.result }}
           PUBLISH_RESULT: ${{ needs.publish.result }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
         run: |
           conclusion=failure
-          if [[ "$BUILD_RESULT" == success && "$PUBLISH_RESULT" == success ]]; then
+          if [[ "$BUILD_RESULT" == success && "$PUBLISH_RESULT" == success && "$DEPLOY_RESULT" == success ]]; then
             conclusion=success
           fi
           runs=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/workflows/release.yml/runs?per_page=100")
