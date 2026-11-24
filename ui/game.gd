@@ -50,9 +50,7 @@ func _ready() -> void:
 
 func _make_theme() -> Theme:
 	var result := Theme.new()
-	var font := SystemFont.new()
-	font.font_names = PackedStringArray(["Noto Sans CJK SC", "Microsoft YaHei", "PingFang SC", "WenQuanYi Zen Hei"])
-	result.default_font = font
+	result.default_font = preload("res://assets/fonts/NotoSansCJKsc-Regular.otf")
 	result.default_font_size = 13
 	result.set_color("font_color", "Label", Color("ebe4d6"))
 	result.set_stylebox("panel", "PanelContainer", _box("202b2d", "56605a", 10))
