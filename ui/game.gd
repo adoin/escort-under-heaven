@@ -15,8 +15,10 @@ var board: BoardView
 var heading: Label
 var district: Label
 var hint: Label
-var vital: Label
-var qi: Label
+var vital: ProgressBar
+var qi: ProgressBar
+var supplies: Label
+var action_buttons: Dictionary = {}
 var status: Label
 var combat_log: Label
 var message: Label
@@ -201,8 +203,10 @@ func _start_play() -> void:
 	var panel := VBoxContainer.new()
 	panel.add_theme_constant_override("separation", 4)
 	sidebar.add_child(panel)
-	vital = _label(panel, "", 15, Color("f0a795"))
-	qi = _label(panel, "", 13, Color("a9d3c9"))
+	action_buttons.clear()
+	vital = _meter(panel, "c96b60")
+	qi = _meter(panel, "56aaa5")
+	supplies = _label(panel, "", 12, MUTED)
 	status = _label(panel, "", 13, GOLD)
 	_pair(panel, "交互 E", interact_near, "等待 .", func(): _act(run.wait))
 	strike = _pair(panel, "普攻 F", func(): _strike(false), "招式 1", func(): _strike(true))
@@ -224,8 +228,95 @@ func _start_play() -> void:
 func _pair(parent: Node, left: String, left_callback: Callable, right: String, right_callback: Callable) -> Button:
 	var row := HBoxContainer.new()
 	parent.add_child(row)
-	_button(row, left, left_callback).size_flags_stretch_ratio = 1
-	return _button(row, right, right_callback)
+	_action_button(row, left, left_callback).size_flags_stretch_ratio = 1
+	return _action_button(row, right, right_callback)
+
+
+
+# Small, code-native pixel masks: no runtime effects library or font glyph icons.
+const ACTION_PIXELS = [
+	["0010100", "0010100", "1010110", "1111111", "0111110", "0011100", "0011100"],
+	["0111110", "0100010", "0010100", "0001000", "0010100", "0100010", "0111110"],
+	["0000011", "0000111", "0001110", "1011100", "0111000", "0110000", "1001000"],
+	["0001000", "1001001", "0101010", "0011100", "1111111", "0011100", "0101010"],
+	["0111110", "0111110", "0110110", "0110110", "0011100", "0011100", "0001000"],
+	["0001000", "0010100", "0100010", "0101010", "0100010", "0011100", "0001000"],
+	["0000110", "0001110", "0011000", "0110000", "1100111", "0000010", "0000100"],
+	["0011100", "0001000", "0111110", "0110110", "0100010", "0110110", "0111110"],
+	["0100010", "1110010", "0100010", "0100111", "0100010", "0011100", "0001000"],
+	["0011000", "0011000", "0001000", "0001100", "0011110", "0111000", "1100000"],
+	["0011100", "0100010", "1111111", "1000001", "1011101", "1000001", "1111111"],
+	["1110111", "1010101", "1010101", "1010101", "1010101", "1111111", "0001000"],
+	["1111111", "1000001", "1011101", "1000001", "1011101", "1000001", "1111111"],
+	["0011100", "0111110", "1101011", "1111111", "1101011", "0111110", "0011100"],
+	["0011100", "0100010", "0000010", "0001100", "0001000", "0000000", "0001000"],
+	["1111111", "1000001", "1011101", "1000001", "1011101", "1000001", "1111111"],
+]
+
+
+func _action_box(fill: String, border: String, width: int = 1) -> StyleBoxFlat:
+	var style := _box(fill, border, 4)
+	style.set_border_width_all(width)
+	style.border_width_bottom = 3
+	return style
+
+
+func _action_button(parent: Node, text: String, callback: Callable) -> Button:
+	var index := action_buttons.size()
+	var button := _button(parent, text, callback)
+	button.custom_minimum_size = Vector2(109, 30)
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.add_theme_font_size_override("font_size", 12)
+	button.add_theme_constant_override("h_separation", 5)
+	button.add_theme_color_override("font_color", Color("eee5cf"))
+	button.add_theme_color_override("font_hover_color", Color("fff0c4"))
+	button.add_theme_color_override("font_pressed_color", Color("ffffff"))
+	button.add_theme_stylebox_override("normal", _action_box("263638", "526863"))
+	button.add_theme_stylebox_override("hover", _action_box("3b504b", "e6c58b"))
+	var down := _action_box("17282c", "77c6bd")
+	down.border_width_top = 3
+	down.border_width_bottom = 1
+	button.add_theme_stylebox_override("pressed", down)
+	var pixels := Image.create(14, 14, false, Image.FORMAT_RGBA8)
+	pixels.fill(Color.TRANSPARENT)
+	for y in range(7):
+		for x in range(7):
+			if ACTION_PIXELS[index][y][x] == "1":
+				pixels.fill_rect(Rect2i(x * 2, y * 2, 2, 2), Color("e6c58b"))
+	button.icon = ImageTexture.create_from_image(pixels)
+	button.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	button.tooltip_text = text
+	action_buttons[text.get_slice(" ", 0)] = button
+	return button
+
+
+func _meter(parent: Node, tint: String) -> ProgressBar:
+	var meter := ProgressBar.new()
+	meter.custom_minimum_size.y = 22
+	meter.show_percentage = false
+	meter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	meter.add_theme_stylebox_override("background", _box("101c21", "526863", 0))
+	var fill := _box(tint, tint, 0)
+	fill.border_color = Color(tint).lightened(0.25)
+	meter.add_theme_stylebox_override("fill", fill)
+	parent.add_child(meter)
+	var label := Label.new()
+	label.name = "Value"
+	label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_color_override("font_color", Color.WHITE)
+	label.add_theme_color_override("font_outline_color", Color("101820"))
+	label.add_theme_constant_override("outline_size", 4)
+	meter.add_child(label)
+	return meter
+
+
+func _update_meter(meter: ProgressBar, title: String, value: int, maximum: int) -> void:
+	meter.max_value = maximum
+	meter.value = value
+	meter.get_node("Value").text = "%s  %d / %d" % [title, value, maximum]
 
 
 func _refresh() -> void:
@@ -237,10 +328,14 @@ func _refresh() -> void:
 	district.text = "第 %d 拍　%s" % [state.beat, job]
 	hint.text = "选跃步落点，或按方向键跃两格。Esc 取消。" if aim == "leap" else run.world.zone().hint
 	message.text = run.notice
-	vital.text = "生命 %d/%d　内力 %d/%d" % [state.hp, run.max_hp(), state.qi, run.max_qi()]
-	qi.text = "饥 %d　渴 %d　现银 %d 两" % [state.hunger, state.thirst, state.coins]
+	_update_meter(vital, "生命", state.hp, run.max_hp())
+	_update_meter(qi, "内力", state.qi, run.max_qi())
+	supplies.text = "饥 %d　渴 %d　现银 %d 两" % [state.hunger, state.thirst, state.coins]
 	status.text = "%s%s%s" % ["流血 %d 拍  " % state.bleed if state.bleed else "", "腿伤  " if state.leg else "", "交战" if run.threatened() else ("轻步" if state.quiet else "状态稳定" if state.bleed == 0 and not state.leg else "")]
 	strike.text = "%s 1" % run.martial.skills[state.weapon].name
+	for key in action_buttons:
+		var selected: bool = (key == "跃步" and aim == "leap") or (key == "轻步" and state.quiet)
+		action_buttons[key].add_theme_stylebox_override("normal", _action_box("34473e", "e6c58b", 2) if selected else _action_box("263638", "526863"))
 	combat_log.text = "\n".join(run.report.slice(-5).duplicate().map(func(line): return "· " + line))
 	board.selected = target
 	board.queue_redraw()
